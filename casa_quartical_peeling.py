@@ -16,6 +16,8 @@ imagename='relic_target_DI_1'
 region_file='bright_src_region.crtf'
 field=''
 spw=''
+mask=''
+scales=''
 
 def addModelData(msname, colname):
     tb.open(vis,nomodify=False)
@@ -68,7 +70,7 @@ def remove_column_if_exists(msname, colname):
 
 def cleaning (vis=vis, imagename=imagename,field=field,spw=spw,
        gridder='wproject',wprojplanes=-1, pblimit=-0.01, imsize=imsize, cell=cell, specmode='mfs',
-       deconvolver='mtmfs', nterms=2, scales=[0], smallscalebias=0.9,datacolumn='corrected',
+       deconvolver='mtmfs', nterms=2, scales=scales, smallscalebias=0.9,datacolumn='corrected',
        interactive=False, niter=niter,  weighting='briggs',robust=0,mask=mask,
        stokes='I', threshold='1e-06', savemodel='modelcolumn',parallel=parallel):
        
@@ -78,6 +80,7 @@ def cleaning (vis=vis, imagename=imagename,field=field,spw=spw,
        interactive=False, niter=niter,  weighting=weighting,robust=robust,mask=mask,
        stokes=stokes, threshold=threshold, savemodel=savemodel,parallel=parallel)
        exportfits(imagename=imagename+'.image.tt0',fitsimage=imagename+'.image.tt0.fits',overwrite=True)
+       
 
 tb.open(vis, nomodify=False)
 cnames = tb.colnames()
@@ -98,8 +101,8 @@ else:
 
 if mask==True:
  
- clean(imagename=imagename,datacolumn='corrected')
- os.system("breizorro --restored-image "+imagename+".image.tt0.fits --threshold 10 --outfile "+imagename+".sigma.mask.fits")
+ cleaning(imagename=imagename,datacolumn='corrected')
+ os.system("breizorro --restored-image "+imagename+".image.tt0.fits --threshold 5 --outfile "+imagename+".sigma.mask.fits")
  importfits(fitsimage=imagename+".mask.fits",imagename=imagename+".sigma.mask")
  mask=imagename+".sigma.mask"
 
@@ -107,11 +110,11 @@ if delay_selfcal==True:
    #remove_column_if_exists(vis, "MODEL_DATA")
    if os.path.exists(imagename+'.C0'+'.mask'):
         os.system("rm -rf "+str(imagename+'.C0'+'.mask'))
-   clean(imagename=imagename+'.C0',datacolumn='corrected',mask=mask)
+   cleaning(imagename=imagename+'.C0',datacolumn='corrected',mask=mask)
    os.system("goquartical input_ms.path="+str(vis)+" input_ms.data_column=CORRECTED_DATA input_ms.select_fields=["+str(field)+"] input_ms.time_chunk='0' input_ms.freq_chunk='0' input_model.recipe=MODEL_DATA solver.terms='[G,K]' solver.iter_recipe='[50,50,50,50,50,50]' solver.propagate_flags=False solver.robust=False solver.threads=1 solver.convergence_fraction=0.99 solver.convergence_criteria=1e-06 output.log_directory=output/KG.outputs.qc/log output.gain_directory=output/KG.output.gain.qc output.overwrite=1 output.products=[corrected_data,corrected_residual] output.columns=[CORRECTED_DATA,CORRECTED_RESIDUAL] output.flags=False dask.threads=6 dask.workers=6 dask.scheduler=threads G.type=phase G.time_interval='10s' G.freq_interval='0' G.initial_estimate=False G.solve_per=antenna G.interp_mode=reim G.interp_method=2dlinear mad_flags.enable=False mad_flags.threshold_bl=6 mad_flags.threshold_global=8 mad_flags.max_deviation=1000 K.time_interval='1s' K.freq_interval='0' K.type=delay_and_offset K.initial_estimate=False K.interp_mode=reim K.interp_method=2dlinear")
    if os.path.exists(imagename+'.GK_SC'+'.mask'):
         os.system("rm -rf "+str(imagename+'.GK_SC'+'.mask'))
-   clean(imagename=imagename+'.GK_SC',datacolumn='corrected',mask=mask,savemodel='modelcolumn')
+   cleaning(imagename=imagename+'.GK_SC',datacolumn='corrected',mask=mask,savemodel='modelcolumn')
    imagename=imagename+'.GK_SC'
  
 if ddcal==True:
@@ -157,8 +160,8 @@ if ddcal==True:
  if models:  # Ensure there's at least one line after skipping the first
     model_string = f"ALL_SKY_MODEL~{'~'.join(models)}:{':'.join(models)}"
 
- os.system("goquartical input_ms.path="+str(vis)+" input_ms.data_column=CORRECTED_DATA input_ms.select_fields=["+str(field)+"] input_ms.time_chunk='0' input_ms.select_ddids=["+str(spw)+"] input_ms.freq_chunk='0' input_model.recipe=ALL_SKY_MODEL~BRIGHT_Source_MODEL:BRIGHT_Source_MODEL solver.terms='[G,K,dE]' solver.iter_recipe='[50,50,50,50,50,50,50,50,50,50,50,50]' solver.robust=False solver.propagate_flags=False solver.threads=1 solver.convergence_fraction=0.99 solver.convergence_criteria=1e-06 output.log_directory=output/KG.outputs.qc/log output.gain_directory=output/KG.output.gain.qc output.log_to_terminal=True output.overwrite=True output.products=[corrected_residual] output.columns=[CORRECTED_DATA] output.flags=False output.subtract_directions=[1] dask.threads=6 dask.workers=6 dask.scheduler=threads G.type=diag_complex G.solve_per=antenna G.time_interval='10' G.freq_interval='0' G.initial_estimate=False G.interp_mode=reim G.interp_method=2dlinear G.respect_scan_boundaries=True dE.direction_dependent=True dE.type=complex dE.time_interval='100' dE.freq_interval='0' mad_flags.enable=False mad_flags.threshold_bl=6 mad_flags.threshold_global=8 mad_flags.max_deviation=1000 K.time_interval='1s' K.freq_interval='0' K.type=delay_and_offset K.initial_estimate=False K.interp_mode=reim K.interp_method=2dlinear")
- clean(imagename=imagename+'.DD',datacolumn='corrected',mask=mask)
+ os.system("goquartical input_ms.path="+str(vis)+" input_ms.data_column=CORRECTED_DATA input_ms.select_fields=["+str(field)+"] input_ms.time_chunk='0' input_ms.select_ddids=["+str(spw)+"] input_ms.freq_chunk='0' input_model.recipe="+str(model_string)+" solver.terms='[G,K,dE]' solver.iter_recipe='[50,50,50,50,50,50,50,50,50,50,50,50]' solver.robust=False solver.propagate_flags=False solver.threads=1 solver.convergence_fraction=0.99 solver.convergence_criteria=1e-06 output.log_directory=output/KG.outputs.qc/log output.gain_directory=output/KG.output.gain.qc output.log_to_terminal=True output.overwrite=True output.products=[corrected_residual] output.columns=[CORRECTED_DATA] output.flags=False output.subtract_directions=[1] dask.threads=6 dask.workers=6 dask.scheduler=threads G.type=diag_complex G.solve_per=antenna G.time_interval='10' G.freq_interval='0' G.initial_estimate=False G.interp_mode=reim G.interp_method=2dlinear G.respect_scan_boundaries=True dE.direction_dependent=True dE.type=complex dE.time_interval='100' dE.freq_interval='0' mad_flags.enable=False mad_flags.threshold_bl=6 mad_flags.threshold_global=8 mad_flags.max_deviation=1000 K.time_interval='1s' K.freq_interval='0' K.type=delay_and_offset K.initial_estimate=False K.interp_mode=reim K.interp_method=2dlinear")
+ cleaning(imagename=imagename+'.DD',datacolumn='corrected',mask=mask)
 
 
 
